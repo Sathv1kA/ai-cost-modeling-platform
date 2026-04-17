@@ -52,7 +52,10 @@ export default function ReportView({ report, initialCallsPerDay = 1000 }: Props)
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CostTable summaries={report.per_model_summaries} />
+        <CostTable
+          summaries={report.per_model_summaries}
+          actualTotalCostUsd={report.actual_total_cost_usd}
+        />
         <CostProjection
           summaries={report.per_model_summaries}
           callSites={report.total_call_sites}

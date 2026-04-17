@@ -27,7 +27,14 @@ def _parse_repo_url(url: str) -> tuple[str, str, str]:
     Handles:
       https://github.com/owner/repo
       https://github.com/owner/repo/tree/branch
+      github.com/owner/repo  (no scheme — browsers often omit it when pasting)
     """
+    url = (url or "").strip()
+    if not url:
+        raise ValueError("Repository URL is empty.")
+    # Without a scheme, urlparse puts "github.com/..." in the path and netloc is empty.
+    if not url.startswith(("http://", "https://", "//")):
+        url = "https://" + url.lstrip("/")
     parsed = urlparse(url)
     if parsed.netloc and "github.com" not in parsed.netloc:
         raise ValueError(f"URL must be a github.com repository, got: {parsed.netloc}")

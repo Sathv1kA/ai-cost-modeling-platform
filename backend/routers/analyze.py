@@ -5,15 +5,13 @@ GET  /pricing  — return static pricing table
 The analysis pipeline also saves the final report to the SQLite cache so it
 can be shared via `/r/<id>` without re-running the scan.
 """
-from __future__ import annotations
-
 import asyncio
 import json
 from datetime import datetime, timezone
 from typing import List
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import StreamingResponse
 
 from config import settings
@@ -159,8 +157,10 @@ async def _stream_analysis(req: AnalyzeRequest):
 
 @router.post("/analyze")
 @limiter.limit(settings.rate_limit_analyze)
-async def analyze(request: Request, req: AnalyzeRequest):
+async def analyze(request: Request, req: AnalyzeRequest = Body(...)):
     # `request` must be named `request` for slowapi to pick it up.
+    # `Body(...)` is required because slowapi's decorator obscures the
+    # signature; without it FastAPI parses `req` as a query param.
     return StreamingResponse(
         _stream_analysis(req),
         media_type="application/x-ndjson",

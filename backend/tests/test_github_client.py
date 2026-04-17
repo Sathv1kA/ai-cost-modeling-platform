@@ -12,6 +12,11 @@ def test_basic():
     assert _parse_repo_url("https://github.com/owner/repo") == ("owner", "repo", "HEAD")
 
 
+def test_scheme_optional_github_host():
+    """Paste style without https:// must still resolve owner/repo."""
+    assert _parse_repo_url("github.com/owner/repo") == ("owner", "repo", "HEAD")
+
+
 def test_strips_git_suffix():
     assert _parse_repo_url("https://github.com/owner/repo.git") == ("owner", "repo", "HEAD")
 

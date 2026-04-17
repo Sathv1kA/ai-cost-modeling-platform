@@ -1,3 +1,22 @@
+"""
+Model pricing catalog.
+
+All prices are **USD per 1M tokens** at the standard (non-batch, non-cached)
+synchronous tier, as published by each provider.
+
+Sources (checked Apr 2026):
+- OpenAI:       https://openai.com/api/pricing/
+- Anthropic:    https://www.anthropic.com/pricing   (API tab, incl. "Legacy models")
+- Google:       https://ai.google.dev/gemini-api/docs/pricing
+- Groq:         https://groq.com/pricing/
+- Mistral:      https://mistral.ai/pricing
+- Cohere:       https://cohere.com/pricing
+- xAI:          https://docs.x.ai/developers/models
+- DeepSeek:     https://api-docs.deepseek.com/quick_start/pricing
+
+Keep this list ordered by provider, then newest → oldest so the "cheapest" and
+"most capable" surfaces in the UI feel natural.
+"""
 from dataclasses import dataclass, field
 from typing import List
 
@@ -6,10 +25,10 @@ from typing import List
 class ModelPricing:
     id: str
     display_name: str
-    provider: str  # "openai" | "anthropic" | "google" | "groq" | "mistral" | "cohere"
+    provider: str  # "openai" | "anthropic" | "google" | "groq" | "mistral" | "cohere" | "xai" | "deepseek"
     context_window: int
-    input_price_per_mtoken: float   # USD per 1M input tokens
-    output_price_per_mtoken: float  # USD per 1M output tokens
+    input_price_per_mtoken: float   # USD per 1M input tokens (standard tier)
+    output_price_per_mtoken: float  # USD per 1M output tokens (standard tier)
     strengths: List[str] = field(default_factory=list)  # task types this model excels at
     quality_tier: str = "mid"       # "budget" | "mid" | "premium"
     supports_vision: bool = False
@@ -17,7 +36,144 @@ class ModelPricing:
 
 
 MODEL_PRICING: List[ModelPricing] = [
-    # --- OpenAI ---
+    # -----------------------------------------------------------------------
+    # OpenAI
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="gpt-5.4",
+        display_name="GPT-5.4",
+        provider="openai",
+        context_window=400_000,
+        input_price_per_mtoken=2.50,
+        output_price_per_mtoken=15.00,
+        strengths=["coding", "reasoning", "rag", "chat"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gpt-5.4-mini",
+        display_name="GPT-5.4 Mini",
+        provider="openai",
+        context_window=400_000,
+        input_price_per_mtoken=0.75,
+        output_price_per_mtoken=4.50,
+        strengths=["coding", "chat", "classification"],
+        quality_tier="mid",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gpt-5.4-nano",
+        display_name="GPT-5.4 Nano",
+        provider="openai",
+        context_window=400_000,
+        input_price_per_mtoken=0.20,
+        output_price_per_mtoken=1.25,
+        strengths=["classification", "chat", "summarization"],
+        quality_tier="budget",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    # Reasoning family
+    ModelPricing(
+        id="o3",
+        display_name="OpenAI o3",
+        provider="openai",
+        context_window=200_000,
+        input_price_per_mtoken=2.00,
+        output_price_per_mtoken=8.00,
+        strengths=["reasoning", "coding"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="o4-mini",
+        display_name="OpenAI o4-mini",
+        provider="openai",
+        context_window=200_000,
+        input_price_per_mtoken=1.10,
+        output_price_per_mtoken=4.40,
+        strengths=["reasoning", "coding"],
+        quality_tier="mid",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="o3-mini",
+        display_name="OpenAI o3-mini",
+        provider="openai",
+        context_window=200_000,
+        input_price_per_mtoken=1.10,
+        output_price_per_mtoken=4.40,
+        strengths=["reasoning"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="o1",
+        display_name="OpenAI o1",
+        provider="openai",
+        context_window=200_000,
+        input_price_per_mtoken=15.00,
+        output_price_per_mtoken=60.00,
+        strengths=["reasoning", "coding"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="o1-mini",
+        display_name="OpenAI o1-mini",
+        provider="openai",
+        context_window=128_000,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=12.00,
+        strengths=["reasoning"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=False,
+    ),
+    # GPT-4.1 family
+    ModelPricing(
+        id="gpt-4.1",
+        display_name="GPT-4.1",
+        provider="openai",
+        context_window=1_000_000,
+        input_price_per_mtoken=2.00,
+        output_price_per_mtoken=8.00,
+        strengths=["coding", "reasoning", "rag", "chat"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gpt-4.1-mini",
+        display_name="GPT-4.1 Mini",
+        provider="openai",
+        context_window=1_000_000,
+        input_price_per_mtoken=0.40,
+        output_price_per_mtoken=1.60,
+        strengths=["coding", "chat", "classification"],
+        quality_tier="mid",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gpt-4.1-nano",
+        display_name="GPT-4.1 Nano",
+        provider="openai",
+        context_window=1_000_000,
+        input_price_per_mtoken=0.10,
+        output_price_per_mtoken=0.40,
+        strengths=["classification", "chat"],
+        quality_tier="budget",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    # GPT-4o family (still widely referenced in existing code)
     ModelPricing(
         id="gpt-4o",
         display_name="GPT-4o",
@@ -42,6 +198,7 @@ MODEL_PRICING: List[ModelPricing] = [
         supports_vision=True,
         supports_function_calling=True,
     ),
+    # Legacy GPT
     ModelPricing(
         id="gpt-4-turbo",
         display_name="GPT-4 Turbo",
@@ -66,7 +223,132 @@ MODEL_PRICING: List[ModelPricing] = [
         supports_vision=False,
         supports_function_calling=True,
     ),
-    # --- Anthropic ---
+
+    # -----------------------------------------------------------------------
+    # Anthropic
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="claude-opus-4-7",
+        display_name="Claude Opus 4.7",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=5.00,
+        output_price_per_mtoken=25.00,
+        strengths=["coding", "reasoning", "rag"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-sonnet-4-6",
+        display_name="Claude Sonnet 4.6",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=15.00,
+        strengths=["coding", "reasoning", "rag", "summarization"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-haiku-4-5",
+        display_name="Claude Haiku 4.5",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=1.00,
+        output_price_per_mtoken=5.00,
+        strengths=["classification", "summarization", "chat"],
+        quality_tier="mid",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    # Legacy Claude 4.x (still billable by Anthropic as "Legacy models")
+    ModelPricing(
+        id="claude-opus-4-6",
+        display_name="Claude Opus 4.6",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=5.00,
+        output_price_per_mtoken=25.00,
+        strengths=["coding", "reasoning"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-sonnet-4-5",
+        display_name="Claude Sonnet 4.5",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=15.00,
+        strengths=["coding", "reasoning", "rag", "summarization"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-opus-4-5",
+        display_name="Claude Opus 4.5",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=5.00,
+        output_price_per_mtoken=25.00,
+        strengths=["coding", "reasoning"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-opus-4-1",
+        display_name="Claude Opus 4.1",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=15.00,
+        output_price_per_mtoken=75.00,
+        strengths=["reasoning", "coding"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-opus-4",
+        display_name="Claude Opus 4",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=15.00,
+        output_price_per_mtoken=75.00,
+        strengths=["reasoning", "coding"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-sonnet-4",
+        display_name="Claude Sonnet 4",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=15.00,
+        strengths=["coding", "reasoning", "rag"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    # Legacy Claude 3.x
+    ModelPricing(
+        id="claude-3-7-sonnet",
+        display_name="Claude 3.7 Sonnet",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=15.00,
+        strengths=["coding", "reasoning", "rag"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
     ModelPricing(
         id="claude-3-5-sonnet",
         display_name="Claude 3.5 Sonnet",
@@ -77,6 +359,18 @@ MODEL_PRICING: List[ModelPricing] = [
         strengths=["coding", "reasoning", "rag", "summarization"],
         quality_tier="premium",
         supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="claude-3-5-haiku",
+        display_name="Claude 3.5 Haiku",
+        provider="anthropic",
+        context_window=200_000,
+        input_price_per_mtoken=0.80,
+        output_price_per_mtoken=4.00,
+        strengths=["classification", "summarization", "chat"],
+        quality_tier="budget",
+        supports_vision=False,
         supports_function_calling=True,
     ),
     ModelPricing(
@@ -103,7 +397,82 @@ MODEL_PRICING: List[ModelPricing] = [
         supports_vision=True,
         supports_function_calling=True,
     ),
-    # --- Google ---
+
+    # -----------------------------------------------------------------------
+    # Google (Gemini)
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="gemini-3.1-pro",
+        display_name="Gemini 3.1 Pro",
+        provider="google",
+        context_window=1_000_000,
+        input_price_per_mtoken=2.00,
+        output_price_per_mtoken=12.00,
+        strengths=["reasoning", "rag", "coding"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gemini-3-flash",
+        display_name="Gemini 3 Flash",
+        provider="google",
+        context_window=1_000_000,
+        input_price_per_mtoken=0.50,
+        output_price_per_mtoken=3.00,
+        strengths=["chat", "summarization", "classification"],
+        quality_tier="mid",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gemini-2.5-pro",
+        display_name="Gemini 2.5 Pro",
+        provider="google",
+        context_window=2_000_000,
+        input_price_per_mtoken=1.25,
+        output_price_per_mtoken=10.00,
+        strengths=["reasoning", "rag", "coding"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gemini-2.5-flash",
+        display_name="Gemini 2.5 Flash",
+        provider="google",
+        context_window=1_000_000,
+        input_price_per_mtoken=0.30,
+        output_price_per_mtoken=2.50,
+        strengths=["chat", "summarization"],
+        quality_tier="mid",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gemini-2.5-flash-lite",
+        display_name="Gemini 2.5 Flash-Lite",
+        provider="google",
+        context_window=1_000_000,
+        input_price_per_mtoken=0.10,
+        output_price_per_mtoken=0.40,
+        strengths=["classification", "chat"],
+        quality_tier="budget",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gemini-2.0-flash",
+        display_name="Gemini 2.0 Flash",
+        provider="google",
+        context_window=1_000_000,
+        input_price_per_mtoken=0.10,
+        output_price_per_mtoken=0.40,
+        strengths=["chat", "classification"],
+        quality_tier="budget",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
     ModelPricing(
         id="gemini-1.5-pro",
         display_name="Gemini 1.5 Pro",
@@ -128,7 +497,162 @@ MODEL_PRICING: List[ModelPricing] = [
         supports_vision=True,
         supports_function_calling=True,
     ),
-    # --- Groq (Llama 3) ---
+
+    # -----------------------------------------------------------------------
+    # xAI (Grok)
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="grok-4",
+        display_name="Grok 4",
+        provider="xai",
+        context_window=2_000_000,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=15.00,
+        strengths=["reasoning", "coding", "chat"],
+        quality_tier="premium",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="grok-4-fast",
+        display_name="Grok 4.1 Fast",
+        provider="xai",
+        context_window=2_000_000,
+        input_price_per_mtoken=0.20,
+        output_price_per_mtoken=0.50,
+        strengths=["chat", "classification"],
+        quality_tier="budget",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="grok-3",
+        display_name="Grok 3",
+        provider="xai",
+        context_window=131_072,
+        input_price_per_mtoken=3.00,
+        output_price_per_mtoken=15.00,
+        strengths=["reasoning", "chat"],
+        quality_tier="premium",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+
+    # -----------------------------------------------------------------------
+    # DeepSeek
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="deepseek-chat",
+        display_name="DeepSeek V3.2 Chat",
+        provider="deepseek",
+        context_window=128_000,
+        input_price_per_mtoken=0.28,
+        output_price_per_mtoken=0.42,
+        strengths=["coding", "chat", "summarization"],
+        quality_tier="budget",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="deepseek-reasoner",
+        display_name="DeepSeek V3.2 Reasoner",
+        provider="deepseek",
+        context_window=128_000,
+        input_price_per_mtoken=0.28,
+        output_price_per_mtoken=0.42,
+        strengths=["reasoning", "coding"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+
+    # -----------------------------------------------------------------------
+    # Groq (managed inference — OSS + Llama + Qwen + Kimi)
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="gpt-oss-120b-groq",
+        display_name="GPT OSS 120B (Groq)",
+        provider="groq",
+        context_window=128_000,
+        input_price_per_mtoken=0.15,
+        output_price_per_mtoken=0.60,
+        strengths=["coding", "chat", "reasoning"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="gpt-oss-20b-groq",
+        display_name="GPT OSS 20B (Groq)",
+        provider="groq",
+        context_window=128_000,
+        input_price_per_mtoken=0.075,
+        output_price_per_mtoken=0.30,
+        strengths=["chat", "classification"],
+        quality_tier="budget",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="llama-4-scout-groq",
+        display_name="Llama 4 Scout (Groq)",
+        provider="groq",
+        context_window=128_000,
+        input_price_per_mtoken=0.11,
+        output_price_per_mtoken=0.34,
+        strengths=["chat", "reasoning"],
+        quality_tier="budget",
+        supports_vision=True,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="qwen3-32b-groq",
+        display_name="Qwen3 32B (Groq)",
+        provider="groq",
+        context_window=131_072,
+        input_price_per_mtoken=0.29,
+        output_price_per_mtoken=0.59,
+        strengths=["coding", "reasoning"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="kimi-k2-groq",
+        display_name="Kimi K2 (Groq)",
+        provider="groq",
+        context_window=128_000,
+        input_price_per_mtoken=1.00,
+        output_price_per_mtoken=3.00,
+        strengths=["coding", "reasoning", "chat"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="llama-3.3-70b-groq",
+        display_name="Llama 3.3 70B Versatile (Groq)",
+        provider="groq",
+        context_window=128_000,
+        input_price_per_mtoken=0.59,
+        output_price_per_mtoken=0.79,
+        strengths=["coding", "chat", "summarization"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="llama-3.1-8b-groq",
+        display_name="Llama 3.1 8B Instant (Groq)",
+        provider="groq",
+        context_window=128_000,
+        input_price_per_mtoken=0.05,
+        output_price_per_mtoken=0.08,
+        strengths=["classification", "chat"],
+        quality_tier="budget",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
     ModelPricing(
         id="llama-3-70b-groq",
         display_name="Llama 3 70B (Groq)",
@@ -153,15 +677,54 @@ MODEL_PRICING: List[ModelPricing] = [
         supports_vision=False,
         supports_function_calling=False,
     ),
-    # --- Mistral ---
+
+    # -----------------------------------------------------------------------
+    # Mistral
+    # -----------------------------------------------------------------------
     ModelPricing(
         id="mistral-large",
         display_name="Mistral Large",
         provider="mistral",
-        context_window=32_768,
+        context_window=128_000,
         input_price_per_mtoken=2.00,
         output_price_per_mtoken=6.00,
         strengths=["coding", "reasoning"],
+        quality_tier="premium",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="mistral-medium",
+        display_name="Mistral Medium 3",
+        provider="mistral",
+        context_window=128_000,
+        input_price_per_mtoken=0.40,
+        output_price_per_mtoken=2.00,
+        strengths=["coding", "chat", "reasoning"],
+        quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="mistral-small",
+        display_name="Mistral Small 3",
+        provider="mistral",
+        context_window=128_000,
+        input_price_per_mtoken=0.20,
+        output_price_per_mtoken=0.60,
+        strengths=["classification", "chat"],
+        quality_tier="budget",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="codestral",
+        display_name="Codestral",
+        provider="mistral",
+        context_window=256_000,
+        input_price_per_mtoken=0.30,
+        output_price_per_mtoken=0.90,
+        strengths=["coding"],
         quality_tier="mid",
         supports_vision=False,
         supports_function_calling=True,
@@ -178,7 +741,22 @@ MODEL_PRICING: List[ModelPricing] = [
         supports_vision=False,
         supports_function_calling=False,
     ),
-    # --- Cohere ---
+
+    # -----------------------------------------------------------------------
+    # Cohere
+    # -----------------------------------------------------------------------
+    ModelPricing(
+        id="command-a",
+        display_name="Command A",
+        provider="cohere",
+        context_window=256_000,
+        input_price_per_mtoken=2.50,
+        output_price_per_mtoken=10.00,
+        strengths=["rag", "reasoning", "summarization"],
+        quality_tier="premium",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
     ModelPricing(
         id="command-r-plus",
         display_name="Command R+",
@@ -188,6 +766,30 @@ MODEL_PRICING: List[ModelPricing] = [
         output_price_per_mtoken=10.00,
         strengths=["rag", "summarization"],
         quality_tier="mid",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="command-r",
+        display_name="Command R",
+        provider="cohere",
+        context_window=128_000,
+        input_price_per_mtoken=0.15,
+        output_price_per_mtoken=0.60,
+        strengths=["rag", "chat"],
+        quality_tier="budget",
+        supports_vision=False,
+        supports_function_calling=True,
+    ),
+    ModelPricing(
+        id="command-r7b",
+        display_name="Command R7B",
+        provider="cohere",
+        context_window=128_000,
+        input_price_per_mtoken=0.0375,
+        output_price_per_mtoken=0.15,
+        strengths=["classification", "chat"],
+        quality_tier="budget",
         supports_vision=False,
         supports_function_calling=True,
     ),
