@@ -64,3 +64,8 @@ Thumbs.db
 # Misc
 *.log
 .claude
+
+# Runtime data (SQLite cache etc.)
+backend/data/
+*.db
+*.db-journal

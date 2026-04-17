@@ -1,68 +1,38 @@
 import { useEffect, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, Download, FileJson, FileText } from "lucide-react";
-import { analyzeRepo } from "../api/client";
-import type { CostReport, ProgressEvent } from "../types";
+import type { CostReport } from "../types";
+import { fetchSharedReport } from "../api/client";
 import ReportView from "../components/ReportView";
-import ShareButton from "../components/ShareButton";
 import ThemeToggle from "../components/ThemeToggle";
-import {
-  SummarySkeleton,
-  TableSkeleton,
-  CallTableSkeleton,
-} from "../components/Skeleton";
+import ShareButton from "../components/ShareButton";
+import { SummarySkeleton, TableSkeleton, CallTableSkeleton } from "../components/Skeleton";
 import { downloadJson, downloadMarkdown } from "../utils/exporters";
 
-type Phase = "idle" | "fetching" | "scanning" | "done" | "error";
+type Phase = "loading" | "done" | "error";
 
-export default function Analysis() {
-  const [params] = useSearchParams();
-  const repoUrl = params.get("repo") ?? "";
-  const token = params.get("token") ?? null;
-  const callsPerDay = Number(params.get("cpd") ?? "1000");
-
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [progress, setProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+export default function SharedReport() {
+  const { id = "" } = useParams<{ id: string }>();
+  const [phase, setPhase] = useState<Phase>("loading");
   const [report, setReport] = useState<CostReport | null>(null);
-  const [reportId, setReportId] = useState<string | null>(null);
-  const [warning, setWarning] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
-    if (!repoUrl) return;
     let cancelled = false;
-    setPhase("fetching");
-    setProgress({ done: 0, total: 0 });
-
-    analyzeRepo(repoUrl, token, callsPerDay, (event) => {
-      if (cancelled) return;
-      if (event.type === "progress") {
-        const p = event as ProgressEvent;
-        if (p.stage === "scanning") {
-          setPhase("scanning");
-        } else if (p.files_scanned !== undefined) {
-          setProgress({ done: p.files_scanned, total: p.total ?? p.files_scanned });
-        }
-      } else if (event.type === "result") {
-        setReport(event.data);
-        setWarning(event.warning);
-        setReportId(event.report_id ?? null);
+    fetchSharedReport(id)
+      .then((r) => {
+        if (cancelled) return;
+        setReport(r);
         setPhase("done");
-      } else if (event.type === "error") {
-        setErrorMsg(event.message);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setErrorMsg(String(err.message ?? err));
         setPhase("error");
-      }
-    }).catch((err) => {
-      if (cancelled) return;
-      setErrorMsg(String(err));
-      setPhase("error");
-    });
-
+      });
     return () => { cancelled = true; };
-  }, [repoUrl, token, callsPerDay]);
-
-  const repoName = repoUrl.replace("https://github.com/", "");
+  }, [id]);
 
   if (phase === "error") {
     return (
@@ -70,68 +40,35 @@ export default function Analysis() {
         <div className="max-w-md text-center">
           <AlertTriangle className="mx-auto text-red-500 mb-3" size={40} />
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
-            Analysis failed
+            Can't load shared report
           </h2>
           <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">{errorMsg}</p>
           <Link
             to="/"
             className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
-            ← Try another repo
+            ← Run a new analysis
           </Link>
         </div>
       </div>
     );
   }
 
-  if (phase !== "done") {
-    const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  if (phase === "loading" || !report) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Link
-                to="/"
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-              >
+              <Link to="/" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                 <ArrowLeft size={20} />
               </Link>
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 font-mono">
-                  {repoName}
-                </h1>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {phase === "scanning" ? "Scanning for LLM calls…" : "Fetching repository…"}
-                </p>
-              </div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                Loading shared report…
+              </h1>
             </div>
             <ThemeToggle />
           </div>
-
-          <div className="mb-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                {phase === "scanning"
-                  ? "Analyzing detected files for LLM calls…"
-                  : progress.total > 0
-                    ? `${progress.done} / ${progress.total} files fetched`
-                    : "Connecting to GitHub…"}
-              </span>
-              {progress.total > 0 && phase !== "scanning" && (
-                <span className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-                  {pct}%
-                </span>
-              )}
-            </div>
-            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-blue-500 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
-                style={{ width: phase === "scanning" ? "90%" : `${pct}%` }}
-              />
-            </div>
-          </div>
-
           <div className="space-y-6">
             <SummarySkeleton />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -145,7 +82,7 @@ export default function Analysis() {
     );
   }
 
-  if (!report) return null;
+  const repoName = report.repo_url.replace("https://github.com/", "");
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 px-4 py-8">
@@ -163,20 +100,18 @@ export default function Analysis() {
                 {repoName}
               </h1>
               <p className="text-sm text-slate-500 dark:text-slate-400">
-                {report.files_scanned} files scanned · {report.total_call_sites} LLM call sites detected
+                Shared report · {report.files_scanned} files · {report.total_call_sites} call sites
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {reportId && <ShareButton reportId={reportId} />}
+            <ShareButton reportId={id} />
             {report.total_call_sites > 0 && (
               <div className="relative">
                 <button
                   onClick={() => setExportOpen((v) => !v)}
                   onBlur={() => setTimeout(() => setExportOpen(false), 150)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                  aria-haspopup="menu"
-                  aria-expanded={exportOpen}
                 >
                   <Download size={14} />
                   Export
@@ -213,14 +148,7 @@ export default function Analysis() {
           </div>
         </div>
 
-        {warning && (
-          <div className="mb-4 flex items-start gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-lg px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-            {warning}
-          </div>
-        )}
-
-        <ReportView report={report} initialCallsPerDay={callsPerDay} />
+        <ReportView report={report} />
       </div>
     </div>
   );

@@ -12,6 +12,11 @@ export interface DetectedCall {
   actual_cost_usd: number | null;
   prompt_snippet: string | null;
   raw_match: string;
+  in_loop: boolean;
+  call_multiplier: number;
+  has_vision: boolean;
+  max_output_tokens: number | null;
+  detection_method: "ast" | "regex";
   recommended_model_id: string | null;
   recommended_cost_usd: number | null;
   potential_savings_usd: number | null;
@@ -86,6 +91,7 @@ export type ResultEvent = {
   type: "result";
   data: CostReport;
   warning: string | null;
+  report_id: string | null;
 };
 
 export type ErrorEvent = {

@@ -1,6 +1,9 @@
 """
 POST /analyze  — main analysis endpoint (streaming NDJSON)
 GET  /pricing  — return static pricing table
+
+The analysis pipeline also saves the final report to the SQLite cache so it
+can be shared via `/r/<id>` without re-running the scan.
 """
 from __future__ import annotations
 
@@ -10,11 +13,13 @@ from datetime import datetime, timezone
 from typing import List
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
+from config import settings
 from models.pricing import MODEL_PRICING
 from models.schemas import AnalyzeRequest, CostReport, ModelPricingOut
+from services.cache import save_report
 from services.cost_calculator import (
     build_file_breakdowns,
     build_model_summaries,
@@ -24,6 +29,7 @@ from services.cost_calculator import (
 )
 from services.detector import scan_all_files
 from services.github_client import fetch_repo_files
+from services.rate_limit import limiter
 from services.recommender import apply_recommendations_to_calls, recommend_for_calls
 
 router = APIRouter()
@@ -47,21 +53,24 @@ async def _stream_analysis(req: AnalyzeRequest):
     progress_queue: asyncio.Queue = asyncio.Queue()
     SENTINEL = object()
 
+    # If the client didn't supply a token, fall back to the server-side default
+    # (settings.default_github_token). Keeps unauthenticated scans from hitting
+    # rate limits immediately.
+    effective_token = req.github_token or settings.default_github_token
+
     async def progress_cb(done: int, total: int):
         await progress_queue.put(("progress", done, total))
 
     async def fetch_wrapper():
         try:
             return await fetch_repo_files(
-                req.repo_url, req.github_token, on_progress=progress_cb
+                req.repo_url, effective_token, on_progress=progress_cb
             )
         finally:
-            # Always signal completion so the streaming loop can exit cleanly
             await progress_queue.put((SENTINEL,))
 
     fetch_task = asyncio.create_task(fetch_wrapper())
 
-    # Drain queue with proper blocking (no busy-loop, no race conditions)
     while True:
         item = await progress_queue.get()
         if item[0] is SENTINEL:
@@ -69,11 +78,9 @@ async def _stream_analysis(req: AnalyzeRequest):
         _, done, total = item
         yield json.dumps({"type": "progress", "files_scanned": done, "total": total}) + "\n"
 
-    # At this point fetch_task is done (or will be momentarily)
     try:
         files, truncated, owner, repo = await fetch_task
     except ValueError as e:
-        # URL parse errors
         yield json.dumps({"type": "error", "message": str(e)}) + "\n"
         return
     except httpx.HTTPStatusError as e:
@@ -93,7 +100,6 @@ async def _stream_analysis(req: AnalyzeRequest):
         files_with_calls = len({c.file_path for c in calls})
         detected_sdks = sorted(set(c.sdk for c in calls))
 
-        # Recommender — picks a cheaper-but-viable model per call site
         recommendations = recommend_for_calls(calls)
         apply_recommendations_to_calls(calls, recommendations)
 
@@ -136,15 +142,25 @@ async def _stream_analysis(req: AnalyzeRequest):
         else None
     )
 
+    # Persist so the result can be shared via a short URL.
+    report_dict = report.model_dump()
+    try:
+        report_id = save_report(report_dict, req.repo_url)
+    except Exception:
+        report_id = None  # caching is best-effort; never break the response
+
     yield json.dumps({
         "type": "result",
-        "data": report.model_dump(),
+        "data": report_dict,
         "warning": warning,
+        "report_id": report_id,
     }) + "\n"
 
 
 @router.post("/analyze")
-async def analyze(req: AnalyzeRequest):
+@limiter.limit(settings.rate_limit_analyze)
+async def analyze(request: Request, req: AnalyzeRequest):
+    # `request` must be named `request` for slowapi to pick it up.
     return StreamingResponse(
         _stream_analysis(req),
         media_type="application/x-ndjson",

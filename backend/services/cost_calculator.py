@@ -1,6 +1,9 @@
 """
 Cost calculation: given detected LLM calls, compute costs across models,
 per-file aggregates, and repo-level actual/recommended totals.
+
+All sums respect `call.call_multiplier` — a call flagged as in-loop counts
+as `call_multiplier` executions (default 10).
 """
 from __future__ import annotations
 
@@ -10,16 +13,24 @@ from models.pricing import MODEL_PRICING, MODEL_PRICING_MAP, ModelPricing
 from models.schemas import DetectedCall, FileBreakdown, ModelCostSummary, ProjectedCost
 
 
+def _effective_input(call: DetectedCall) -> int:
+    return call.estimated_input_tokens * call.call_multiplier
+
+
+def _effective_output(call: DetectedCall) -> int:
+    return call.estimated_output_tokens * call.call_multiplier
+
+
 def _call_cost_for_model(call: DetectedCall, model: ModelPricing) -> float:
-    input_cost = (call.estimated_input_tokens / 1_000_000) * model.input_price_per_mtoken
-    output_cost = (call.estimated_output_tokens / 1_000_000) * model.output_price_per_mtoken
+    input_cost = (_effective_input(call) / 1_000_000) * model.input_price_per_mtoken
+    output_cost = (_effective_output(call) / 1_000_000) * model.output_price_per_mtoken
     return input_cost + output_cost
 
 
 def build_model_summaries(calls: List[DetectedCall]) -> List[ModelCostSummary]:
     summaries = []
-    total_input = sum(c.estimated_input_tokens for c in calls)
-    total_output = sum(c.estimated_output_tokens for c in calls)
+    total_input = sum(_effective_input(c) for c in calls)
+    total_output = sum(_effective_output(c) for c in calls)
     for model in MODEL_PRICING:
         total_cost = sum(_call_cost_for_model(c, model) for c in calls)
         summaries.append(ModelCostSummary(
@@ -69,10 +80,11 @@ def build_file_breakdowns(calls: List[DetectedCall]) -> List[FileBreakdown]:
             "cost": 0.0,
             "sdks": set(),
         })
-        agg["count"] += 1
-        agg["input"] += c.estimated_input_tokens
-        agg["output"] += c.estimated_output_tokens
+        agg["count"] += c.call_multiplier
+        agg["input"] += _effective_input(c)
+        agg["output"] += _effective_output(c)
         if c.actual_cost_usd is not None:
+            # actual_cost_usd already includes the multiplier at detection time
             agg["cost"] += c.actual_cost_usd
         agg["sdks"].add(c.sdk)
 

@@ -26,10 +26,13 @@ MIN_RELATIVE_SAVINGS = 0.15
 
 
 def _cost_for(call: DetectedCall, model: ModelPricing) -> float:
-    return (
+    # Include the loop multiplier so per-call costs compare apples-to-apples
+    # with the detector-produced `actual_cost_usd`.
+    base = (
         (call.estimated_input_tokens / 1_000_000) * model.input_price_per_mtoken
         + (call.estimated_output_tokens / 1_000_000) * model.output_price_per_mtoken
     )
+    return base * call.call_multiplier
 
 
 def _pick_best_for_call(

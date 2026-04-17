@@ -205,9 +205,27 @@ export default function CallBreakdown({ calls, summaries }: Props) {
                           <div className="text-xs text-slate-400 dark:text-slate-500">line {call.line_number}</div>
                         </td>
                         <td className="py-2 pr-3">
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${SDK_COLORS[call.sdk] ?? "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>
-                            {call.sdk}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${SDK_COLORS[call.sdk] ?? "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>
+                              {call.sdk}
+                            </span>
+                            {call.in_loop && (
+                              <span
+                                title={`Detected in a loop — cost estimated at ${call.call_multiplier}× a single call`}
+                                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+                              >
+                                ×{call.call_multiplier}
+                              </span>
+                            )}
+                            {call.has_vision && (
+                              <span
+                                title="Vision input detected — token estimate increased"
+                                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-500/15 dark:text-fuchsia-300"
+                              >
+                                vision
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2 pr-3">
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${TASK_COLORS[call.task_type] ?? "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>

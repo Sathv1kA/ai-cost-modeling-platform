@@ -1,4 +1,16 @@
-import type { StreamEvent } from "../types";
+import type { CostReport, StreamEvent } from "../types";
+
+export async function fetchSharedReport(reportId: string): Promise<CostReport> {
+  const resp = await fetch(`/reports/${encodeURIComponent(reportId)}`);
+  if (resp.status === 404) {
+    throw new Error("Report not found — it may have expired.");
+  }
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Server error ${resp.status}: ${text}`);
+  }
+  return resp.json();
+}
 
 export async function analyzeRepo(
   repoUrl: string,

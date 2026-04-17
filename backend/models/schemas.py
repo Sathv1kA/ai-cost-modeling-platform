@@ -19,9 +19,15 @@ class DetectedCall(BaseModel):
     call_type: str
     estimated_input_tokens: int
     estimated_output_tokens: int
-    actual_cost_usd: Optional[float] = None   # cost at the resolved model's prices
+    actual_cost_usd: Optional[float] = None   # cost at the resolved model's prices (already × multiplier)
     prompt_snippet: Optional[str] = None
     raw_match: str
+    # Extraction signals from the smarter detector:
+    in_loop: bool = False                     # call appears inside a for/while/.map/.forEach
+    call_multiplier: int = 1                  # estimated executions — 1 if not in loop, default 10 if in loop
+    has_vision: bool = False                  # call includes image content → token counts bumped
+    max_output_tokens: Optional[int] = None   # extracted from code; output tokens capped at this
+    detection_method: str = "regex"           # "ast" for Python AST path, "regex" for JS/TS/notebooks
     # Recommender output (filled in after initial detection):
     recommended_model_id: Optional[str] = None
     recommended_cost_usd: Optional[float] = None

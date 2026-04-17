@@ -4,6 +4,7 @@ import { ThemeProvider } from "./theme/ThemeProvider";
 
 const Home = lazy(() => import("./pages/Home"));
 const Analysis = lazy(() => import("./pages/Analysis"));
+const SharedReport = lazy(() => import("./pages/SharedReport"));
 
 function PageFallback() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/analysis" element={<Analysis />} />
+            <Route path="/r/:id" element={<SharedReport />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
