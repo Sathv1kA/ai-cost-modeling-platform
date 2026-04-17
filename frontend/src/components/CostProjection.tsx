@@ -1,18 +1,12 @@
 import { useMemo } from "react";
 import type { ModelCostSummary } from "../types";
+import { fmtCost } from "../utils/formatters";
 
 interface Props {
   summaries: ModelCostSummary[];
   callSites: number;
   initialCallsPerDay: number;
   onCallsPerDayChange: (v: number) => void;
-}
-
-function fmtMoney(n: number): string {
-  if (n < 0.01) return `$${n.toFixed(4)}`;
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
 }
 
 // Log-scale slider: value 0–100 maps to 1–1_000_000
@@ -41,13 +35,13 @@ export default function CostProjection({ summaries, callSites, initialCallsPerDa
   }, [summaries, callSites, initialCallsPerDay]);
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-slate-800 mb-4">Cost Projection</h2>
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Cost Projection</h2>
 
       <div className="mb-4">
-        <label className="text-sm text-slate-600 mb-1 block">
+        <label className="text-sm text-slate-600 dark:text-slate-300 mb-1 block">
           Daily call volume:{" "}
-          <span className="font-semibold text-slate-900">
+          <span className="font-semibold text-slate-900 dark:text-slate-100">
             {initialCallsPerDay.toLocaleString()} calls/day
           </span>
         </label>
@@ -59,7 +53,7 @@ export default function CostProjection({ summaries, callSites, initialCallsPerDa
           onChange={(e) => onCallsPerDayChange(sliderToValue(Number(e.target.value)))}
           className="w-full accent-blue-600"
         />
-        <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mt-0.5">
           <span>1</span>
           <span>1K</span>
           <span>10K</span>
@@ -71,7 +65,7 @@ export default function CostProjection({ summaries, callSites, initialCallsPerDa
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-xs text-slate-500 uppercase tracking-wide border-b border-slate-100">
+            <tr className="text-left text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide border-b border-slate-100 dark:border-slate-800">
               <th className="pb-2 font-medium">Model</th>
               <th className="pb-2 font-medium text-right">Daily</th>
               <th className="pb-2 font-medium text-right">Monthly</th>
@@ -79,16 +73,19 @@ export default function CostProjection({ summaries, callSites, initialCallsPerDa
           </thead>
           <tbody>
             {projections.slice(0, 8).map((p, i) => (
-              <tr key={p.model_id} className={`border-b border-slate-50 ${i === 0 ? "bg-green-50" : ""}`}>
-                <td className="py-1.5 text-slate-700 text-xs">{p.display_name}</td>
-                <td className="py-1.5 text-right font-mono text-xs text-slate-900">{fmtMoney(p.daily)}</td>
-                <td className="py-1.5 text-right font-mono text-xs font-semibold text-slate-900">{fmtMoney(p.monthly)}</td>
+              <tr
+                key={p.model_id}
+                className={`border-b border-slate-50 dark:border-slate-800 ${i === 0 ? "bg-green-50 dark:bg-green-500/10" : ""}`}
+              >
+                <td className="py-1.5 text-slate-700 dark:text-slate-200 text-xs">{p.display_name}</td>
+                <td className="py-1.5 text-right font-mono text-xs text-slate-900 dark:text-slate-100">{fmtCost(p.daily)}</td>
+                <td className="py-1.5 text-right font-mono text-xs font-semibold text-slate-900 dark:text-slate-100">{fmtCost(p.monthly)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-slate-400 mt-2">
+      <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
         Based on {callSites} detected call site{callSites !== 1 ? "s" : ""} · estimates ±30%
       </p>
     </div>

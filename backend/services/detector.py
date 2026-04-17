@@ -8,7 +8,9 @@ import re
 import uuid
 from typing import List, Optional
 
+from models.pricing import MODEL_PRICING_MAP
 from models.schemas import DetectedCall
+from services.model_resolver import resolve_model_id
 from utils.token_estimator import (
     estimate_tokens,
     default_input_tokens,
@@ -139,6 +141,18 @@ def _detect_call_type(context: str) -> str:
     return "chat"
 
 
+def _actual_cost(input_tokens: int, output_tokens: int, resolved_model_id: Optional[str]) -> Optional[float]:
+    if not resolved_model_id:
+        return None
+    pricing = MODEL_PRICING_MAP.get(resolved_model_id)
+    if not pricing:
+        return None
+    return (
+        (input_tokens / 1_000_000) * pricing.input_price_per_mtoken
+        + (output_tokens / 1_000_000) * pricing.output_price_per_mtoken
+    )
+
+
 def scan_file(file_path: str, content: str) -> List[DetectedCall]:
     lines = content.splitlines()
     calls: List[DetectedCall] = []
@@ -166,18 +180,27 @@ def scan_file(file_path: str, content: str) -> List[DetectedCall]:
             context = _extract_context(lines, line_idx)
             call_type = _detect_call_type(context)
             model_hint = _extract_model_hint(context)
+            resolved_model_id = resolve_model_id(model_hint)
             prompt_snippet = _extract_prompt_snippet(context)
             task_type = _infer_task_type(prompt_snippet or context, call_type)
 
-            # Token estimation
+            # Token estimation — tiktoken for the prompt snippet, defaults otherwise
             is_code = file_path.endswith((".py", ".ts", ".js", ".tsx", ".jsx"))
             if prompt_snippet:
-                input_tokens = estimate_tokens(prompt_snippet, is_code=is_code)
+                input_tokens = estimate_tokens(
+                    prompt_snippet,
+                    is_code=is_code,
+                    resolved_model_id=resolved_model_id,
+                )
+                # Floor at 1/4 of the task-type default so a short one-liner prompt
+                # doesn't massively undercount realistic in-context usage.
                 input_tokens = max(input_tokens, default_input_tokens(task_type) // 4)
             else:
                 input_tokens = default_input_tokens(task_type)
 
             output_tokens = default_output_tokens(task_type)
+
+            actual_cost = _actual_cost(input_tokens, output_tokens, resolved_model_id)
 
             calls.append(DetectedCall(
                 id=str(uuid.uuid4()),
@@ -185,10 +208,12 @@ def scan_file(file_path: str, content: str) -> List[DetectedCall]:
                 line_number=line_idx + 1,
                 sdk=sdk,
                 model_hint=model_hint,
+                resolved_model_id=resolved_model_id,
                 task_type=task_type,
                 call_type=call_type,
                 estimated_input_tokens=input_tokens,
                 estimated_output_tokens=output_tokens,
+                actual_cost_usd=round(actual_cost, 6) if actual_cost is not None else None,
                 prompt_snippet=prompt_snippet,
                 raw_match=line.strip()[:200],
             ))

@@ -1,14 +1,29 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
-import Analysis from "./pages/Analysis";
+import { ThemeProvider } from "./theme/ThemeProvider";
+
+const Home = lazy(() => import("./pages/Home"));
+const Analysis = lazy(() => import("./pages/Analysis"));
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-950">
+      <div className="text-slate-400 dark:text-slate-500 text-sm">Loading…</div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/analysis" element={<Analysis />} />
-      </Routes>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/analysis" element={<Analysis />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

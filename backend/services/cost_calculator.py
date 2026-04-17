@@ -1,12 +1,13 @@
 """
-Cost calculation: given detected LLM calls, compute cost across all models.
+Cost calculation: given detected LLM calls, compute costs across models,
+per-file aggregates, and repo-level actual/recommended totals.
 """
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
-from models.pricing import MODEL_PRICING, ModelPricing
-from models.schemas import DetectedCall, ModelCostSummary, ProjectedCost
+from models.pricing import MODEL_PRICING, MODEL_PRICING_MAP, ModelPricing
+from models.schemas import DetectedCall, FileBreakdown, ModelCostSummary, ProjectedCost
 
 
 def _call_cost_for_model(call: DetectedCall, model: ModelPricing) -> float:
@@ -56,3 +57,60 @@ def build_projections(
             monthly_cost_usd=round(daily * 30, 4),
         ))
     return projections
+
+
+def build_file_breakdowns(calls: List[DetectedCall]) -> List[FileBreakdown]:
+    by_file: dict[str, dict] = {}
+    for c in calls:
+        agg = by_file.setdefault(c.file_path, {
+            "count": 0,
+            "input": 0,
+            "output": 0,
+            "cost": 0.0,
+            "sdks": set(),
+        })
+        agg["count"] += 1
+        agg["input"] += c.estimated_input_tokens
+        agg["output"] += c.estimated_output_tokens
+        if c.actual_cost_usd is not None:
+            agg["cost"] += c.actual_cost_usd
+        agg["sdks"].add(c.sdk)
+
+    breakdowns = [
+        FileBreakdown(
+            file_path=path,
+            call_count=agg["count"],
+            total_input_tokens=agg["input"],
+            total_output_tokens=agg["output"],
+            actual_cost_usd=round(agg["cost"], 6),
+            sdks=sorted(agg["sdks"]),
+        )
+        for path, agg in by_file.items()
+    ]
+    # Most expensive file first; ties → most calls → path.
+    breakdowns.sort(
+        key=lambda b: (-b.actual_cost_usd, -b.call_count, b.file_path)
+    )
+    return breakdowns
+
+
+def compute_actual_total(calls: List[DetectedCall]) -> tuple[Optional[float], int]:
+    """
+    Sum actual_cost_usd across calls that successfully resolved to a known model.
+    Returns (total_or_None_if_no_resolved_calls, count_of_resolved_calls).
+    """
+    resolved = [c for c in calls if c.actual_cost_usd is not None]
+    if not resolved:
+        return None, 0
+    return round(sum(c.actual_cost_usd or 0.0 for c in resolved), 6), len(resolved)
+
+
+def compute_recommended_total(calls: List[DetectedCall]) -> Optional[float]:
+    """Sum recommended_cost_usd + fall through to actual for calls with no recommendation."""
+    resolved = [c for c in calls if c.actual_cost_usd is not None]
+    if not resolved:
+        return None
+    total = 0.0
+    for c in resolved:
+        total += c.recommended_cost_usd if c.recommended_cost_usd is not None else (c.actual_cost_usd or 0.0)
+    return round(total, 6)

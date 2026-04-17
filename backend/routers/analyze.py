@@ -15,9 +15,16 @@ from fastapi.responses import StreamingResponse
 
 from models.pricing import MODEL_PRICING
 from models.schemas import AnalyzeRequest, CostReport, ModelPricingOut
-from services.cost_calculator import build_model_summaries, build_projections
+from services.cost_calculator import (
+    build_file_breakdowns,
+    build_model_summaries,
+    build_projections,
+    compute_actual_total,
+    compute_recommended_total,
+)
 from services.detector import scan_all_files
 from services.github_client import fetch_repo_files
+from services.recommender import apply_recommendations_to_calls, recommend_for_calls
 
 router = APIRouter()
 
@@ -86,8 +93,21 @@ async def _stream_analysis(req: AnalyzeRequest):
         files_with_calls = len({c.file_path for c in calls})
         detected_sdks = sorted(set(c.sdk for c in calls))
 
+        # Recommender — picks a cheaper-but-viable model per call site
+        recommendations = recommend_for_calls(calls)
+        apply_recommendations_to_calls(calls, recommendations)
+
         summaries = build_model_summaries(calls)
         projections = build_projections(summaries, req.calls_per_day, len(calls))
+        file_breakdowns = build_file_breakdowns(calls)
+
+        actual_total, resolved_count = compute_actual_total(calls)
+        recommended_total = compute_recommended_total(calls)
+        potential_savings = (
+            round(actual_total - recommended_total, 6)
+            if (actual_total is not None and recommended_total is not None)
+            else None
+        )
 
         report = CostReport(
             repo_url=req.repo_url,
@@ -98,6 +118,12 @@ async def _stream_analysis(req: AnalyzeRequest):
             calls=calls,
             per_model_summaries=summaries,
             projections=projections,
+            file_breakdowns=file_breakdowns,
+            recommendations=recommendations,
+            actual_total_cost_usd=actual_total,
+            resolved_call_count=resolved_count,
+            recommended_total_cost_usd=recommended_total,
+            total_potential_savings_usd=potential_savings,
             generated_at=datetime.now(timezone.utc).isoformat(),
         )
     except Exception as e:
