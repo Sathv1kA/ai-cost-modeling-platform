@@ -27,6 +27,7 @@ from services.cost_calculator import (
 )
 from services.detector import scan_all_files
 from services.github_client import fetch_repo_files
+from services.llm_recommender import RecommenderError, recommend_with_llm
 from services.rate_limit import limiter
 from services.recommender import apply_recommendations_to_calls, recommend_for_calls
 
@@ -120,7 +121,33 @@ async def _stream_analysis(req: AnalyzeRequest):
         files_with_calls = len({c.file_path for c in calls})
         detected_sdks = sorted(set(c.sdk for c in calls))
 
-        recommendations = recommend_for_calls(calls)
+        # Pick recommender engine. AI is opt-in and requires a key; if it
+        # fails for any reason, silently fall back to the heuristic so the
+        # report still renders. The reason is surfaced on the report so the
+        # UI can show a small "AI failed, showing heuristic" banner.
+        recommender_mode = "heuristic"
+        fallback_reason: str | None = None
+        recommendations = []
+
+        if req.use_ai_recommender and calls:
+            if not req.recommender_api_key:
+                fallback_reason = "AI recommender was requested but no API key was supplied."
+            else:
+                try:
+                    recommendations = await recommend_with_llm(
+                        calls,
+                        api_key=req.recommender_api_key,
+                        provider=req.recommender_provider,
+                    )
+                    recommender_mode = "ai"
+                except RecommenderError as e:
+                    fallback_reason = f"AI recommender failed: {e}"
+                except Exception as e:  # noqa: BLE001 — belt-and-suspenders
+                    fallback_reason = f"AI recommender crashed: {e}"
+
+        if recommender_mode != "ai":
+            recommendations = recommend_for_calls(calls)
+
         apply_recommendations_to_calls(calls, recommendations)
 
         summaries = build_model_summaries(calls)
@@ -150,6 +177,8 @@ async def _stream_analysis(req: AnalyzeRequest):
             resolved_call_count=resolved_count,
             recommended_total_cost_usd=recommended_total,
             total_potential_savings_usd=potential_savings,
+            recommender_mode=recommender_mode,
+            recommender_fallback_reason=fallback_reason,
             generated_at=datetime.now(timezone.utc).isoformat(),
         )
     except Exception as e:

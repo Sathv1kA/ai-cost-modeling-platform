@@ -37,18 +37,25 @@ export default function Recommendations({ report }: Props) {
 
   const displayed = showAll ? sorted : sorted.slice(0, 8);
   const totalSavings = report.total_potential_savings_usd ?? 0;
+  const isAi = report.recommender_mode === "ai";
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Sparkles size={16} className="text-green-500" />
+          <Sparkles size={16} className={isAi ? "text-violet-500" : "text-green-500"} />
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
             Swap recommendations
             <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
               ({sorted.length} {sorted.length === 1 ? "opportunity" : "opportunities"})
             </span>
           </h2>
+          {isAi && (
+            <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300">
+              <Sparkles size={10} />
+              AI
+            </span>
+          )}
         </div>
         {totalSavings > 0 && (
           <div className="flex items-center gap-1 text-sm font-semibold text-green-600 dark:text-green-400">

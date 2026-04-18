@@ -60,6 +60,7 @@ export interface Recommendation {
   recommended_cost_usd: number;
   savings_usd: number;
   rationale: string;
+  source: "heuristic" | "ai";
 }
 
 export interface CostReport {
@@ -77,6 +78,8 @@ export interface CostReport {
   resolved_call_count: number;
   recommended_total_cost_usd: number | null;
   total_potential_savings_usd: number | null;
+  recommender_mode: "heuristic" | "ai";
+  recommender_fallback_reason: string | null;
   generated_at: string;
 }
 

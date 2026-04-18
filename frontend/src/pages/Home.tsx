@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Zap, Link as LinkIcon } from "lucide-react";
+import { ChevronDown, Zap, Link as LinkIcon, Sparkles } from "lucide-react";
 import ThemeToggle from "../components/ThemeToggle";
 
 const SAMPLE_REPOS = [
@@ -15,6 +15,8 @@ export default function Home() {
   const [token, setToken] = useState("");
   const [callsPerDay, setCallsPerDay] = useState(1000);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [useAi, setUseAi] = useState(false);
+  const [aiKey, setAiKey] = useState("");
   const [error, setError] = useState("");
 
   function handleSubmit(e: React.FormEvent) {
@@ -28,11 +30,23 @@ export default function Home() {
       setError("URL must be a github.com repository link.");
       return;
     }
+    if (useAi && !aiKey.trim()) {
+      setError("Provide an Anthropic API key, or turn off AI recommender.");
+      return;
+    }
     setError("");
-    const params = new URLSearchParams({ repo: trimmed });
-    if (token) params.set("token", token);
-    params.set("cpd", String(callsPerDay));
-    navigate(`/analysis?${params.toString()}`);
+    // URL holds only non-sensitive params so the query string stays shareable
+    // without leaking secrets. Tokens and API keys ride along via router state
+    // (in-memory only, not written to browser history or referer headers).
+    const params = new URLSearchParams({ repo: trimmed, cpd: String(callsPerDay) });
+    navigate(`/analysis?${params.toString()}`, {
+      state: {
+        githubToken: token || null,
+        aiRecommender: useAi
+          ? { provider: "anthropic" as const, apiKey: aiKey.trim() }
+          : null,
+      },
+    });
   }
 
   return (
@@ -138,6 +152,47 @@ export default function Home() {
                   max={10_000_000}
                   className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              {/* AI recommender opt-in */}
+              <div className="pt-1">
+                <label className="flex items-start gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={useAi}
+                    onChange={(e) => setUseAi(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium text-slate-700 dark:text-slate-300 inline-flex items-center gap-1">
+                      <Sparkles size={13} className="text-violet-500" />
+                      Use AI to pick the best model per use case
+                    </span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Sends one batched request to Claude Haiku with your API key. Typical
+                      cost: &lt;$0.01 per scan. Falls back to the heuristic on any error.
+                    </span>
+                  </span>
+                </label>
+
+                {useAi && (
+                  <div className="mt-2 pl-6">
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                      Anthropic API key
+                    </label>
+                    <input
+                      type="password"
+                      value={aiKey}
+                      onChange={(e) => setAiKey(e.target.value)}
+                      placeholder="sk-ant-..."
+                      autoComplete="off"
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                      Used once per scan, never stored or logged.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}

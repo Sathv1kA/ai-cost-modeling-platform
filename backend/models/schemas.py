@@ -6,6 +6,12 @@ class AnalyzeRequest(BaseModel):
     repo_url: str
     github_token: Optional[str] = None
     calls_per_day: int = 1000
+    # Optional: use a real LLM to judge which model is best for each call.
+    # Requires an API key. Falls back to the built-in heuristic on any error
+    # so an invalid key or network blip doesn't break the analysis.
+    use_ai_recommender: bool = False
+    recommender_provider: str = "anthropic"   # "anthropic" is the only one for now
+    recommender_api_key: Optional[str] = None
 
 
 class DetectedCall(BaseModel):
@@ -72,6 +78,9 @@ class Recommendation(BaseModel):
     recommended_cost_usd: float
     savings_usd: float
     rationale: str
+    # Which engine produced this recommendation: "heuristic" (default, built-in
+    # strength/cost scoring) or "ai" (LLM-judged when the user supplies a key).
+    source: str = "heuristic"
 
 
 class CostReport(BaseModel):
@@ -89,6 +98,12 @@ class CostReport(BaseModel):
     resolved_call_count: int = 0
     recommended_total_cost_usd: Optional[float] = None
     total_potential_savings_usd: Optional[float] = None
+    # Which engine produced the per-call recommendations. "ai" if the LLM
+    # recommender ran successfully, else "heuristic".
+    recommender_mode: str = "heuristic"
+    # Populated when AI was requested but failed for some reason, so the UI
+    # can show a small banner ("AI failed, fell back to heuristic: ...").
+    recommender_fallback_reason: Optional[str] = None
     generated_at: str
 
 

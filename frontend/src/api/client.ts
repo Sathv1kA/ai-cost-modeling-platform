@@ -1,5 +1,15 @@
 import type { CostReport, StreamEvent } from "../types";
 
+/**
+ * Opt-in LLM recommender config. When present, the backend asks the named
+ * provider to judge each call shape with the supplied key. The key rides
+ * in the request body (HTTPS) and is never echoed back; it is not stored.
+ */
+export interface AiRecommenderConfig {
+  provider: "anthropic";
+  apiKey: string;
+}
+
 export type AnalyzeErrorKind =
   | "rate_limit"
   | "not_found"
@@ -94,6 +104,7 @@ export async function analyzeRepo(
   repoUrl: string,
   githubToken: string | null,
   callsPerDay: number,
+  aiConfig: AiRecommenderConfig | null,
   onEvent: (event: StreamEvent) => void,
 ): Promise<void> {
   let resp: Response;
@@ -105,6 +116,9 @@ export async function analyzeRepo(
         repo_url: repoUrl,
         github_token: githubToken || null,
         calls_per_day: callsPerDay,
+        use_ai_recommender: aiConfig !== null,
+        recommender_provider: aiConfig?.provider ?? "anthropic",
+        recommender_api_key: aiConfig?.apiKey ?? null,
       }),
     });
   } catch (e) {
