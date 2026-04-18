@@ -33,17 +33,36 @@ from services.recommender import apply_recommendations_to_calls, recommend_for_c
 router = APIRouter()
 
 
-def _friendly_http_error(e: httpx.HTTPStatusError) -> str:
+def _friendly_http_error(e: httpx.HTTPStatusError, *, has_token: bool) -> str:
     status = e.response.status_code
     if status == 404:
-        return "Repository not found. Check the URL or make sure the repo is public."
-    if status == 403:
+        # A 404 from GitHub can mean (a) the repo genuinely doesn't exist,
+        # (b) the name is misspelled, or (c) the repo is private and the
+        # caller isn't authenticated. GitHub intentionally returns 404
+        # (not 403) for private repos so their existence isn't leaked.
+        if has_token:
+            return (
+                "Repository not found. Check the URL — or your token may not "
+                "have access to this repo."
+            )
         return (
-            "GitHub API rate limit reached or access denied. "
-            "Try providing a personal access token in the Advanced options."
+            "Repository not found. If it's private, add a GitHub token in "
+            "Advanced options. Otherwise double-check the URL."
         )
+    if status == 403:
+        body = (e.response.text or "").lower()
+        if "rate limit" in body or "api rate" in body:
+            if has_token:
+                return "GitHub API rate limit reached for your token. Try again later."
+            return (
+                "GitHub API rate limit reached. Add a GitHub token in "
+                "Advanced options to raise the limit."
+            )
+        return "Access denied by GitHub. The repo may require authentication."
     if status == 401:
-        return "GitHub token is invalid or expired."
+        return "GitHub token is invalid or expired. Check Advanced options."
+    if status == 451:
+        return "Repository is unavailable for legal reasons (DMCA or similar)."
     return f"GitHub API error {status}: {e.response.text[:200]}"
 
 
@@ -82,7 +101,10 @@ async def _stream_analysis(req: AnalyzeRequest):
         yield json.dumps({"type": "error", "message": str(e)}) + "\n"
         return
     except httpx.HTTPStatusError as e:
-        yield json.dumps({"type": "error", "message": _friendly_http_error(e)}) + "\n"
+        yield json.dumps({
+            "type": "error",
+            "message": _friendly_http_error(e, has_token=bool(effective_token)),
+        }) + "\n"
         return
     except httpx.RequestError as e:
         yield json.dumps({"type": "error", "message": f"Network error contacting GitHub: {e}"}) + "\n"

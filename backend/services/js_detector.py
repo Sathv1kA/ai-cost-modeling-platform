@@ -102,8 +102,13 @@ TASK_KEYWORDS = [
     ("embedding", re.compile(r"embed|embedding", re.I)),
 ]
 
-COMMENT_RE = re.compile(r"^\s*(#|//)")
+COMMENT_RE = re.compile(r"^\s*(#|//|\*|/\*)")
 IMPORT_RE = re.compile(r"^\s*(from\s+\S+\s+import|import\s+\S+|const\s+.*=\s*require\()")
+
+# Block comment stripping. We handle `/* ... */` that open and close on the same
+# line by collapsing them away before scanning. Multi-line block comments are
+# tracked via _in_block_comment below.
+_SINGLE_LINE_BLOCK_RE = re.compile(r"/\*.*?\*/")
 
 # Tokens that open a loop scope when followed by `(` or body-start.
 _LOOP_LINE_RE = re.compile(
@@ -283,12 +288,31 @@ def scan_js_file(file_path: str, content: str) -> List[DetectedCall]:
     ctor_bindings = _collect_ctor_bindings(content)
     loop_depths = _compute_loop_depths(lines)
 
+    # Mark lines that fall fully within `/* ... */` block comments so we don't
+    # accidentally detect calls inside them. Single-line `/* ... */` is stripped
+    # per-line before trigger matching.
+    in_block = [False] * len(lines)
+    block_open = False
+    for i, raw in enumerate(lines):
+        if block_open:
+            in_block[i] = True
+            if "*/" in raw:
+                block_open = False
+            continue
+        # If a block opens on this line and doesn't close here, mark future lines
+        if "/*" in raw and "*/" not in raw.split("/*", 1)[1]:
+            block_open = True
+
     calls: list[DetectedCall] = []
     seen_lines: set[int] = set()
 
-    for line_idx, line in enumerate(lines):
+    for line_idx, raw_line in enumerate(lines):
         if line_idx in seen_lines:
             continue
+        if in_block[line_idx]:
+            continue
+        # Strip `/* ... */` on the same line before any downstream checks.
+        line = _SINGLE_LINE_BLOCK_RE.sub("", raw_line)
         if COMMENT_RE.match(line):
             continue
         if IMPORT_RE.match(line):

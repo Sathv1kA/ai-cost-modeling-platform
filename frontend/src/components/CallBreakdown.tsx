@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Search, Sparkles } from "lucide-react";
 import { Highlight, themes } from "prism-react-renderer";
 import type { DetectedCall, ModelCostSummary } from "../types";
-import { useTheme } from "../theme/ThemeProvider";
+import { useTheme } from "../theme/useTheme";
 import { fmtCost, fmtTokens } from "../utils/formatters";
 
 const SDK_COLORS: Record<string, string> = {
@@ -26,6 +26,31 @@ const TASK_COLORS: Record<string, string> = {
 };
 
 type SortKey = "file" | "sdk" | "task" | "cost";
+
+function SortBtn({
+  sortKey,
+  label,
+  activeKey,
+  onSelect,
+}: {
+  sortKey: SortKey;
+  label: string;
+  activeKey: SortKey;
+  onSelect: (k: SortKey) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(sortKey)}
+      className={`text-xs font-medium uppercase tracking-wide pb-2 border-b-2 transition-colors ${
+        activeKey === sortKey
+          ? "border-blue-500 text-blue-600 dark:text-blue-400"
+          : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
 
 interface Props {
   calls: DetectedCall[];
@@ -102,20 +127,6 @@ export default function CallBreakdown({ calls, summaries }: Props) {
     });
   }
 
-  function SortBtn({ k, label }: { k: SortKey; label: string }) {
-    return (
-      <button
-        onClick={() => setSort(k)}
-        className={`text-xs font-medium uppercase tracking-wide pb-2 border-b-2 transition-colors ${
-          sort === k
-            ? "border-blue-500 text-blue-600 dark:text-blue-400"
-            : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-        }`}
-      >
-        {label}
-      </button>
-    );
-  }
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
@@ -172,14 +183,14 @@ export default function CallBreakdown({ calls, summaries }: Props) {
               <thead>
                 <tr className="text-left border-b border-slate-100 dark:border-slate-800">
                   <th className="pb-2 pr-3 w-5"></th>
-                  <th className="pb-2 pr-3"><SortBtn k="file" label="File / Line" /></th>
-                  <th className="pb-2 pr-3"><SortBtn k="sdk" label="SDK" /></th>
-                  <th className="pb-2 pr-3"><SortBtn k="task" label="Task" /></th>
+                  <th className="pb-2 pr-3"><SortBtn sortKey="file" label="File / Line" activeKey={sort} onSelect={setSort} /></th>
+                  <th className="pb-2 pr-3"><SortBtn sortKey="sdk" label="SDK" activeKey={sort} onSelect={setSort} /></th>
+                  <th className="pb-2 pr-3"><SortBtn sortKey="task" label="Task" activeKey={sort} onSelect={setSort} /></th>
                   <th className="pb-2 pr-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                     Tokens (in/out)
                   </th>
                   <th className="pb-2 text-right">
-                    <SortBtn k="cost" label={`Cost (${cheapest?.display_name ?? "cheapest"})`} />
+                    <SortBtn sortKey="cost" label={`Cost (${cheapest?.display_name ?? "cheapest"})`} activeKey={sort} onSelect={setSort} />
                   </th>
                 </tr>
               </thead>

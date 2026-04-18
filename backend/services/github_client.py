@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from config import settings
 from utils.file_filter import should_scan_file
 
 GITHUB_API = "https://api.github.com"
@@ -123,6 +124,16 @@ async def fetch_repo_files(
             if item.get("type") == "blob"
             and should_scan_file(item["path"], item.get("size", 0))
         ]
+
+        # 2a. Guard against massive repos tying up the server. If the filter
+        # yields more scannable files than the cap, keep the largest N (on the
+        # theory that bigger files are more likely to contain meaningful code
+        # than single-export stubs) and set truncated so the UI warns the user.
+        cap = settings.max_scannable_files
+        if len(scannable) > cap:
+            scannable.sort(key=lambda it: it.get("size", 0), reverse=True)
+            scannable = scannable[:cap]
+            truncated = True
 
         total = len(scannable)
         results = []

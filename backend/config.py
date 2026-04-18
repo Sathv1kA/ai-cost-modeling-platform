@@ -51,5 +51,9 @@ class Settings:
     # How long cached reports live, in days
     cache_ttl_days: int = _int(os.getenv("CACHE_TTL_DAYS"), 30)
 
+    # Maximum number of scannable files per repo. A hard cap prevents a huge
+    # monorepo from tying up the server with thousands of GitHub API calls.
+    max_scannable_files: int = _int(os.getenv("MAX_SCANNABLE_FILES"), 600)
+
 
 settings = Settings()

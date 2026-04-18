@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, AlertTriangle, Download, FileJson, FileText } from "lucide-react";
-import { analyzeRepo } from "../api/client";
+import { ArrowLeft, AlertTriangle, Download, FileJson, FileText, Clock, KeyRound, Search, Wifi, ServerCrash } from "lucide-react";
+import { analyzeRepo, AnalyzeError, type AnalyzeErrorKind } from "../api/client";
 import type { CostReport, ProgressEvent } from "../types";
 import ReportView from "../components/ReportView";
 import ShareButton from "../components/ShareButton";
@@ -27,11 +27,17 @@ export default function Analysis() {
   const [reportId, setReportId] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [errorKind, setErrorKind] = useState<AnalyzeErrorKind>("unknown");
+  const [retryAfter, setRetryAfter] = useState<number | undefined>(undefined);
   const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     if (!repoUrl) return;
     let cancelled = false;
+    // Reset progress/state on a fresh mount or URL change. This is genuine
+    // effect-driven state (we want to re-trigger the network request), so the
+    // eslint `set-state-in-effect` warning is a false positive here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase("fetching");
     setProgress({ done: 0, total: 0 });
 
@@ -50,12 +56,28 @@ export default function Analysis() {
         setReportId(event.report_id ?? null);
         setPhase("done");
       } else if (event.type === "error") {
-        setErrorMsg(event.message);
+        // In-stream error (e.g. GitHub 404 after the connection was established).
+        // Infer a kind from the message so the UI can hint token/URL fixes.
+        const msg = event.message;
+        let kind: AnalyzeErrorKind = "server";
+        if (/rate limit/i.test(msg)) kind = "rate_limit";
+        else if (/not found|check the url/i.test(msg)) kind = "not_found";
+        else if (/token|invalid|expired|access denied/i.test(msg)) kind = "auth";
+        else if (/network/i.test(msg)) kind = "network";
+        setErrorMsg(msg);
+        setErrorKind(kind);
         setPhase("error");
       }
     }).catch((err) => {
       if (cancelled) return;
-      setErrorMsg(String(err));
+      if (err instanceof AnalyzeError) {
+        setErrorMsg(err.message);
+        setErrorKind(err.kind);
+        setRetryAfter(err.retryAfterSeconds);
+      } else {
+        setErrorMsg(String(err));
+        setErrorKind("unknown");
+      }
       setPhase("error");
     });
 
@@ -65,14 +87,19 @@ export default function Analysis() {
   const repoName = repoUrl.replace("https://github.com/", "");
 
   if (phase === "error") {
+    const ui = errorUi(errorKind, errorMsg, { retryAfter, hasToken: !!token });
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center px-4">
         <div className="max-w-md text-center">
-          <AlertTriangle className="mx-auto text-red-500 mb-3" size={40} />
+          <div className={`mx-auto mb-3 ${ui.iconClass}`}>{ui.icon}</div>
           <h2 className="text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">
-            Analysis failed
+            {ui.title}
           </h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">{errorMsg}</p>
+          <p className="text-slate-600 dark:text-slate-300 text-sm mb-2">{ui.body}</p>
+          {ui.hint && (
+            <p className="text-slate-500 dark:text-slate-400 text-xs mb-4">{ui.hint}</p>
+          )}
+          {!ui.hint && <div className="mb-4" />}
           <Link
             to="/"
             className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
@@ -224,4 +251,93 @@ export default function Analysis() {
       </div>
     </div>
   );
+}
+
+type ErrorUi = {
+  icon: React.ReactNode;
+  iconClass: string;
+  title: string;
+  body: string;
+  hint?: string;
+};
+
+function errorUi(
+  kind: AnalyzeErrorKind,
+  rawMsg: string,
+  opts: { retryAfter?: number; hasToken: boolean },
+): ErrorUi {
+  const red = "text-red-500";
+  const amber = "text-amber-500";
+  const slate = "text-slate-400";
+
+  switch (kind) {
+    case "rate_limit": {
+      const wait = opts.retryAfter
+        ? `Try again in about ${Math.ceil(opts.retryAfter / 60)} minute${opts.retryAfter >= 120 ? "s" : ""}.`
+        : "Wait a few minutes before trying again.";
+      return {
+        icon: <Clock size={40} />,
+        iconClass: amber,
+        title: "Rate limit reached",
+        body: rawMsg,
+        hint: wait,
+      };
+    }
+    case "not_found":
+      return {
+        icon: <Search size={40} />,
+        iconClass: slate,
+        title: "Repository not found",
+        body: rawMsg,
+        hint: opts.hasToken
+          ? "Double-check the URL. Your token may not have access to this repo."
+          : "Double-check the URL. If it's a private repo, add a GitHub token in Advanced options on the home page.",
+      };
+    case "auth":
+      return {
+        icon: <KeyRound size={40} />,
+        iconClass: red,
+        title: "Authentication problem",
+        body: rawMsg,
+        hint: "Verify your GitHub token has `repo` scope and hasn't expired.",
+      };
+    case "network":
+      return {
+        icon: <Wifi size={40} />,
+        iconClass: red,
+        title: "Can't reach the server",
+        body: rawMsg,
+        hint: "Check your connection, or the backend may be down.",
+      };
+    case "stream":
+      return {
+        icon: <Wifi size={40} />,
+        iconClass: amber,
+        title: "Connection dropped",
+        body: rawMsg,
+        hint: "The analysis was interrupted. Try running it again.",
+      };
+    case "validation":
+      return {
+        icon: <AlertTriangle size={40} />,
+        iconClass: amber,
+        title: "Invalid request",
+        body: rawMsg,
+      };
+    case "server":
+      return {
+        icon: <ServerCrash size={40} />,
+        iconClass: red,
+        title: "Server error",
+        body: rawMsg,
+        hint: "Something went wrong on our end. Try again in a moment.",
+      };
+    default:
+      return {
+        icon: <AlertTriangle size={40} />,
+        iconClass: red,
+        title: "Analysis failed",
+        body: rawMsg,
+      };
+  }
 }
